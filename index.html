@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Destiny 2 Vault Cleaner</title>
+    <style>
+
+        body {
+            background-color: black;
+            text-align: center;
+            vertical-align: middle;
+            color: white;
+            font-size: 16px;
+            font-family: sans-serif;
+        }
+
+        body * {
+            color: white;
+            background-color: black;
+            font-size: 16px;
+            font-family: sans-serif;
+        }
+
+        select, button, input {
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 15px;
+        }
+
+        select, input {
+            padding: 5px 8px;
+        }
+
+    </style>
+</head>
+<body>
+    <input type="file" accept=".csv" id="file" onchange="selectFile(this.files[0]);">
+    <br/>
+    <br/>
+    <span>Number of Redundancies: </span>
+    <select id="redundancy-select">
+        <option>1</option>
+        <option>2</option>
+        <option>3</option>
+        <option>4</option>
+    </select>
+    <br/>
+    <br/>
+    <span>Stats Considered:</span>
+    <br/>
+    <input type="checkbox" class="stat-checkbox" id="mobility">Mobility
+    <input type="checkbox" class="stat-checkbox" id="resilience">Resilience
+    <input type="checkbox" class="stat-checkbox" id="recovery">Recovery
+    <input type="checkbox" class="stat-checkbox" id="discipline">Discipline
+    <input type="checkbox" class="stat-checkbox" id="intellect">Intellect
+    <input type="checkbox" class="stat-checkbox" id="strength">Strength
+    <br/>
+    <br/>
+    <button onclick="filterArmour();">Go</button>
+    <br/>
+    <br/>
+    <textarea id="output"></textarea>
+    <br/>
+    <button onclick="copyOutput();">Copy Text</button>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script type="text/javascript">
+
+        window.onerror = function (errorMsg, url, lineNumber) {
+            alert('Error: ' + errorMsg + ' Script: ' + url + ' Line: ' + lineNumber);
+        }
+
+        var data;
+
+        function filterArmour()
+        {
+            var statNames = getCheckedStats();
+            var maxRedundancies = +document.getElementById("redundancy-select").value;
+            var goodArmour = [];
+            var badArmour = [];
+            for (var i = 0; i < data.length; i++)
+            {
+                if (data[i]["Type"] === "Warlock Bond" || data[i]["Type"] === "Hunter Cloak" || data[i]["Type"] === "Titan Mark" || data[i]["Tier"] !== "Legendary") continue;
+                var redundancies = 0;
+                var redundancyItems = [];
+                for (var j = 0; j < data.length; j++)
+                {
+                    if (i === j || data[i]["Type"] !== data[j]["Type"] || data[i]["Equippable"] !== data[j]["Equippable"] || data[j]["Tier"] !== "Legendary") continue;
+                    var isRedundant = true;
+                    for (var statIndex = 0; statIndex < statNames.length; statIndex++)
+                    {
+                        if (+data[i][statNames[statIndex]] > +data[j][statNames[statIndex]])
+                        {
+                            isRedundant = false;
+                        }
+                    }
+                    if (isRedundant)
+                    {
+                        redundancies++;
+                        var obj = { name: data[j]["Name"], recovery: data[j]["Recovery (Base)"], discipline: data[j]["Discipline (Base)"], intellect: data[j]["Intellect (Base)"] };
+                        redundancyItems.push(obj);
+                    }
+                }
+                var obj = { name: data[i]["Name"], recovery: data[i]["Recovery (Base)"], discipline: data[i]["Discipline (Base)"], intellect: data[i]["Intellect (Base)"], id: data[i]["Id"].replace(/\D/g,'') };
+                if (redundancies >= maxRedundancies)
+                {
+                    badArmour.push({ armour: obj, redundancies: redundancyItems });
+                }
+                else
+                {
+                    goodArmour.push(obj);
+                }
+            }
+            console.log(goodArmour);
+            console.log(badArmour);
+            var str = "id:";
+            for (var i = 0; i < badArmour.length; i++)
+            {
+                if (i > 0) str += " or id:"
+                str += badArmour[i].armour.id;
+            }
+            document.getElementById("output").value = str;
+        }
+
+        function getCheckedStats()
+        {
+            var idSelector = function() { return this.id; };
+            var stats = $(".stat-checkbox:checkbox:checked").map(idSelector).get();
+            for (var i = 0; i < stats.length; i++)
+            {
+                stats[i] = stats[i][0].toUpperCase() + stats[i].slice(1) + " (Base)";
+            }
+            return stats;
+        }
+
+        function selectFile(file)
+        {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var text = e.target.result;
+                data = csvToArray(text);
+            };
+            reader.readAsText(file);
+        }
+
+        function copyOutput()
+        {
+            document.getElementById('output').select();
+            navigator.clipboard.writeText(document.getElementById('output').value);
+        }
+
+        function csvToArray(str, delimiter = ",") {
+            // slice from start of text to the first \n index
+            // use split to create an array from string by delimiter
+            const headers = str.slice(0, str.indexOf("\n")).split(delimiter);
+
+            // slice from \n index + 1 to the end of the text
+            // use split to create an array of each csv value row
+            const rows = str.slice(str.indexOf("\n") + 1).split("\n");
+
+            // Map the rows
+            // split values from each row into an array
+            // use headers.reduce to create an object
+            // object properties derived from headers:values
+            // the object passed as an element of the array
+            const arr = rows.map(function (row) {
+                const values = row.split(delimiter);
+                const el = headers.reduce(function (object, header, index) {
+                object[header] = values[index];
+                return object;
+                }, {});
+                return el;
+            });
+
+            // return the array
+            return arr;
+        }
+
+    </script>
+</body>
+</html>
